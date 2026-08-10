@@ -208,7 +208,7 @@ function renderCaseList() {
             <span class="badge tier-${c.case_tier}">${escapeHtml(tierLabel)}</span>
             ${c.complaint_category ? `<span class="badge category">${escapeHtml(c.complaint_category)}</span>` : ''}
           </div>
-          <div class="sub">${escapeHtml(c.customer_name || 'Unknown customer')}${c.customer_complaint ? ` — ${escapeHtml(c.customer_complaint)}` : ''}</div>
+          <div class="sub">${escapeHtml(c.customer_name || 'Unknown customer')}</div>
         </div>
         <div class="side">
           <div class="store">PC ${escapeHtml(c.store_pc || '—')}</div>
@@ -223,6 +223,17 @@ function renderCaseList() {
 function detailRow(label, value) {
   if (!value) return '';
   return `<div class="modal-row"><span class="modal-row-label">${escapeHtml(label)}</span><span class="modal-row-value">${escapeHtml(value)}</span></div>`;
+}
+
+// Gmail's plain-text export leaves a lot of blank lines (between header
+// fields, around signature blocks, etc.) — collapse runs of them down to a
+// single blank line so the modal isn't mostly whitespace.
+function formatLongText(text) {
+  const collapsed = String(text)
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return escapeHtml(collapsed).replace(/\n/g, '<br>');
 }
 
 function openModal(c) {
@@ -252,10 +263,10 @@ function openModal(c) {
 
     <div class="modal-section">
       <h3>Complaint</h3>
-      <p class="modal-text">${c.customer_complaint ? escapeHtml(c.customer_complaint).replace(/\n/g, '<br>') : 'No complaint text recorded yet.'}</p>
+      <p class="modal-text">${c.customer_complaint ? formatLongText(c.customer_complaint) : 'No complaint text recorded yet.'}</p>
     </div>
 
-    ${c.comments ? `<div class="modal-section"><h3>Comments</h3><p class="modal-text">${escapeHtml(c.comments).replace(/\n/g, '<br>')}</p></div>` : ''}
+    ${c.comments ? `<div class="modal-section"><h3>Comments</h3><p class="modal-text">${formatLongText(c.comments)}</p></div>` : ''}
 
     <div class="modal-section">
       <h3>Raw case label</h3>

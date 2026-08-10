@@ -1,0 +1,7 @@
+// Copy this file to public/config.js and fill in your values.
+// SUPABASE_ANON_KEY is safe to expose in the browser — it only grants the
+// read-only access defined by the Row Level Security policies in schema.sql.
+window.CASE_WATCH_CONFIG = {
+  SUPABASE_URL: "https://YOUR-PROJECT.supabase.co",
+  SUPABASE_ANON_KEY: "YOUR-ANON-PUBLIC-KEY",
+};

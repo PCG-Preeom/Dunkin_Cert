@@ -1,0 +1,9 @@
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+# Cron schedules are defined inline in each function file via
+# `export const config = { schedule: "..." }` — nothing needed here.

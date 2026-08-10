@@ -1,0 +1,4 @@
+window.CASE_WATCH_CONFIG = {
+  SUPABASE_URL: "https://rblpmctgdgsgdeyvvrhr.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJibHBtY3RnZGdzZ2RleXZ2cmhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxMjI5MTEsImV4cCI6MjEwMTY5ODkxMX0.pC8GEa05zZRozHuDJof_QGaXb5JylfFvlIQf3caQ2QY",
+};

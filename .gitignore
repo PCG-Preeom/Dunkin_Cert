@@ -1,5 +1,4 @@
 node_modules/
 .env
 .netlify/
-public/config.js
 netlify-dev.log

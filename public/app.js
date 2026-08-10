@@ -225,11 +225,27 @@ function detailRow(label, value) {
   return `<div class="modal-row"><span class="modal-row-label">${escapeHtml(label)}</span><span class="modal-row-value">${escapeHtml(value)}</span></div>`;
 }
 
-// Gmail's plain-text export leaves a lot of blank lines (between header
-// fields, around signature blocks, etc.) — collapse runs of them down to a
-// single blank line so the modal isn't mostly whitespace.
+// These rows were mostly pasted straight from Gmail's web UI, which drags
+// along on-screen chrome that isn't part of the actual message: the
+// "DBI Case # ..." line (already shown in the badges above), then
+// External / Inbox / "Summarize this email" / sender / timestamp / "to me"
+// — all before the real message text starts. Strip that block out.
+function stripEmailChrome(text) {
+  const lines = String(text).split('\n');
+  if (lines[0] && /^DBI Case #/i.test(lines[0].trim())) lines.shift();
+
+  const toLineIdx = lines.findIndex((l) => /^to\s/i.test(l.trim()));
+  if (toLineIdx !== -1 && toLineIdx < 10) {
+    lines.splice(0, toLineIdx + 1);
+  }
+  return lines.join('\n');
+}
+
+// Gmail's export also leaves a lot of blank lines (between header fields,
+// around signature blocks, etc.) — collapse runs of them down to a single
+// blank line so the modal isn't mostly whitespace.
 function formatLongText(text) {
-  const collapsed = String(text)
+  const collapsed = stripEmailChrome(text)
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();

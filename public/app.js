@@ -30,6 +30,14 @@ function tabSortKey(tab) {
   return Number(match[2]) * 12 + monthIdx;
 }
 
+// Complaint text now comes from pasted emails, which can contain "&", "<",
+// ">" etc. — escape it so it renders as text instead of breaking the markup.
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[ch]));
+}
+
 const state = {
   cases: [],
   filter: 'all',
@@ -42,6 +50,11 @@ const emptyStateEl = document.getElementById('emptyState');
 const leaderboardEl = document.getElementById('leaderboardList');
 const syncStatusEl = document.getElementById('syncStatus');
 const monthFilterEl = document.getElementById('monthFilter');
+const modalBackdropEl = document.getElementById('modalBackdrop');
+const modalBodyEl = document.getElementById('modalBody');
+const modalCloseEl = document.getElementById('modalClose');
+
+let lastFocusedEl = null;
 
 function timeAgo(iso) {
   if (!iso) return null;
@@ -144,7 +157,7 @@ function renderLeaderboard() {
       return `
       <div class="store-card">
         <div class="rank">#${i + 1}</div>
-        <div class="pc">PC ${s.pc}</div>
+        <div class="pc">PC ${escapeHtml(s.pc)}</div>
         <div class="store-bar" role="img" aria-label="${s.high} worst, ${s.medium} needs attention, ${s.low} good out of ${s.count} cases">
           <span class="seg high" style="width:${pct(s.high)}%"></span>
           <span class="seg medium" style="width:${pct(s.medium)}%"></span>
@@ -182,7 +195,7 @@ function renderCaseList() {
       const amount = c.amount ? `$${Number(c.amount).toFixed(2)}` : null;
       const tierLabel = TIER_LABELS[c.case_tier] || c.case_tier;
       return `
-      <div class="case-row">
+      <div class="case-row" role="button" tabindex="0" data-case-id="${escapeHtml(c.case_id)}" aria-label="View details for case ${escapeHtml(c.case_id)}">
         <div class="meter-wrap" role="img" aria-label="Severity ${c.severity_score} of 100, ${c.severity_label}">
           <span class="meter-label">${c.severity_score}</span>
           <div class="meter-track">
@@ -191,21 +204,101 @@ function renderCaseList() {
         </div>
         <div class="main">
           <div class="main-head">
-            <span class="case-id">${c.case_id}</span>
-            <span class="badge tier-${c.case_tier}">${tierLabel}</span>
-            ${c.complaint_category ? `<span class="badge category">${c.complaint_category}</span>` : ''}
+            <span class="case-id">${escapeHtml(c.case_id)}</span>
+            <span class="badge tier-${c.case_tier}">${escapeHtml(tierLabel)}</span>
+            ${c.complaint_category ? `<span class="badge category">${escapeHtml(c.complaint_category)}</span>` : ''}
           </div>
-          <div class="sub">${c.customer_name || 'Unknown customer'}${c.customer_complaint ? ` — ${c.customer_complaint}` : ''}</div>
+          <div class="sub">${escapeHtml(c.customer_name || 'Unknown customer')}${c.customer_complaint ? ` — ${escapeHtml(c.customer_complaint)}` : ''}</div>
         </div>
         <div class="side">
-          <div class="store">PC ${c.store_pc || '—'}</div>
-          <div>${c.date_in_sent || 'No date logged'}</div>
+          <div class="store">PC ${escapeHtml(c.store_pc || '—')}</div>
+          <div>${escapeHtml(c.date_in_sent || 'No date logged')}</div>
           ${amount ? `<div class="amount">${amount}</div>` : ''}
         </div>
       </div>`;
     })
     .join('');
 }
+
+function detailRow(label, value) {
+  if (!value) return '';
+  return `<div class="modal-row"><span class="modal-row-label">${escapeHtml(label)}</span><span class="modal-row-value">${escapeHtml(value)}</span></div>`;
+}
+
+function openModal(c) {
+  const amount = c.amount ? `$${Number(c.amount).toFixed(2)}` : null;
+  const tierLabel = TIER_LABELS[c.case_tier] || c.case_tier;
+
+  modalBodyEl.innerHTML = `
+    <div class="modal-head">
+      <span class="case-id">${escapeHtml(c.case_id)}</span>
+      <span class="badge tier-${c.case_tier}">${escapeHtml(tierLabel)}</span>
+      ${c.complaint_category ? `<span class="badge category">${escapeHtml(c.complaint_category)}</span>` : ''}
+    </div>
+    <h2 id="modalTitle" class="modal-title">${escapeHtml(c.customer_name || 'Unknown customer')}</h2>
+    <div class="meter-wrap modal-meter" role="img" aria-label="Severity ${c.severity_score} of 100, ${c.severity_label}">
+      <span class="meter-label">${c.severity_score} / 100 — ${escapeHtml(c.severity_label)}</span>
+      <div class="meter-track">
+        <div class="meter-fill ${c.severity_label}" style="width:${c.severity_score}%"></div>
+      </div>
+    </div>
+
+    ${detailRow('Store', c.store_pc ? `PC ${c.store_pc}` : null)}
+    ${detailRow('Date', c.date_in_sent)}
+    ${detailRow('Amount', amount)}
+    ${detailRow('Email', c.email)}
+    ${detailRow('Phone', c.phone)}
+    ${detailRow('Month', c.sheet_tab)}
+
+    <div class="modal-section">
+      <h3>Complaint</h3>
+      <p class="modal-text">${c.customer_complaint ? escapeHtml(c.customer_complaint).replace(/\n/g, '<br>') : 'No complaint text recorded yet.'}</p>
+    </div>
+
+    ${c.comments ? `<div class="modal-section"><h3>Comments</h3><p class="modal-text">${escapeHtml(c.comments).replace(/\n/g, '<br>')}</p></div>` : ''}
+
+    <div class="modal-section">
+      <h3>Raw case label</h3>
+      <p class="modal-text modal-raw">${escapeHtml(c.raw_label)}</p>
+    </div>
+  `;
+
+  lastFocusedEl = document.activeElement;
+  modalBackdropEl.hidden = false;
+  modalCloseEl.focus();
+}
+
+function closeModal() {
+  modalBackdropEl.hidden = true;
+  modalBodyEl.innerHTML = '';
+  if (lastFocusedEl) lastFocusedEl.focus();
+}
+
+caseListEl.addEventListener('click', (e) => {
+  const row = e.target.closest('.case-row');
+  if (!row) return;
+  const c = state.cases.find((x) => x.case_id === row.dataset.caseId);
+  if (c) openModal(c);
+});
+
+caseListEl.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const row = e.target.closest('.case-row');
+  if (!row) return;
+  e.preventDefault();
+  const c = state.cases.find((x) => x.case_id === row.dataset.caseId);
+  if (c) openModal(c);
+});
+
+modalCloseEl.addEventListener('click', closeModal);
+
+modalBackdropEl.addEventListener('click', (e) => {
+  if (e.target === modalBackdropEl) closeModal();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !modalBackdropEl.hidden) closeModal();
+});
 
 document.getElementById('filterChips').addEventListener('click', (e) => {
   const btn = e.target.closest('.chip');

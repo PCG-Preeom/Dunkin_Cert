@@ -41,9 +41,12 @@ export function extractComplaintCategory(raw) {
   return match ? match[1].trim() : null;
 }
 
+// Accepts "M/D/YY(YY)" (the sheet's own DateInSent format) and "MM-DD-YYYY"
+// (how dates show up inside pasted Guest Support emails, e.g. "Incident Date:
+// 08-08-2026") — both are M/D/Y, just with a different separator.
 export function normalizeDate(value) {
   if (!value) return null;
-  const parts = String(value).split('/');
+  const parts = String(value).split(/[/-]/);
   if (parts.length === 3) {
     const [m, d, yRaw] = parts;
     // Some rows use a 2-digit year (e.g. "5/1/26") — treat as 2000s.
@@ -65,6 +68,28 @@ export function normalizeDate(value) {
     return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
   }
   return null; // unrecognized format — leave it out rather than guess
+}
+
+// Fallback for rows where DateInSent is blank because the whole raw Guest
+// Support email got pasted into Customer Complaint instead — those emails
+// always carry a date themselves ("Incident Date: 08-08-2026" or "Contact
+// Received: 08-08-2026 07:47:54 PM EDT"). Tries Incident Date first since
+// that's the actual event date; Contact Received is only when there's no
+// pasted email that we're missing.
+const DATE_IN_TEXT_PATTERNS = [
+  /Incident Date:\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
+  /Contact Received:\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
+];
+export function extractDateFromText(text) {
+  if (!text) return null;
+  for (const regex of DATE_IN_TEXT_PATTERNS) {
+    const match = String(text).match(regex);
+    if (match) {
+      const normalized = normalizeDate(match[1]);
+      if (normalized) return normalized;
+    }
+  }
+  return null;
 }
 
 export function parseAmount(value) {
@@ -188,7 +213,7 @@ export function parseCaseRow(row, sheetTab) {
     store_pc: extractStorePc(raw),
     customer_name: row.CustomerName || null,
     customer_complaint: row.CustomerComplaint || null,
-    date_in_sent: normalizeDate(row.DateInSent),
+    date_in_sent: normalizeDate(row.DateInSent) || extractDateFromText(row.CustomerComplaint),
     amount,
     email: row.Email || null,
     phone: row.Phone || null,

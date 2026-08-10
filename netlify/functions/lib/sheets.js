@@ -29,25 +29,70 @@ export async function listTabNames() {
   return (res.data.sheets || []).map((s) => s.properties.title);
 }
 
+// Accepted header text per field — matched case/whitespace-insensitively so
+// small variations ("Date In Sent" vs "Date Sent") still resolve, and listed
+// in priority order in case a tab has more than one plausible match.
+const HEADER_ALIASES = {
+  Case: ['case'],
+  CustomerName: ['customer name', 'name'],
+  CustomerComplaint: ['customer complaint', 'complaint'],
+  DateInSent: ['date in sent', 'date sent', 'date'],
+  Amount: ['amount'],
+  Email: ['email'],
+  Phone: ['phone'],
+  Comments: ['comments', 'comment'],
+};
+const normalizeHeader = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
 // Row 3 in the sheet is the header (Case, Customer Name, ...), data starts row 4.
+// Column order isn't assumed to be fixed A-H — some month tabs have an extra or
+// reordered column (confirmed directly: a tab with an inserted column shifted
+// every field after it, so Email came back holding a dollar amount and Phone
+// held an email address). Reading the header row and mapping by name instead
+// of position means a reordered/inserted column can't silently scramble data.
 export async function fetchTabRows(tabName) {
   const sheets = google.sheets({ version: 'v4', auth: getAuth() });
-  const range = `'${tabName}'!A4:H2000`;
+
+  const headerRes = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+    range: `'${tabName}'!A3:Z3`,
+  });
+  const headerRow = (headerRes.data.values || [[]])[0] || [];
+  const normalizedHeaders = headerRow.map(normalizeHeader);
+
+  // Build field -> column index by matching against HEADER_ALIASES. Falls back
+  // to the original fixed A-H position for any field whose header can't be
+  // found at all, so a totally blank/malformed header row doesn't stop the
+  // sync outright — but logs it, since that fallback is the exact scenario
+  // that caused this bug in the first place.
+  const FALLBACK_INDEX = { Case: 0, CustomerName: 1, CustomerComplaint: 2, DateInSent: 3, Amount: 4, Email: 5, Phone: 6, Comments: 7 };
+  const colIndex = {};
+  for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
+    const idx = normalizedHeaders.findIndex((h) => aliases.includes(h));
+    if (idx === -1) {
+      console.warn(`[sheets] "${tabName}": couldn't find a header for ${field} (saw: ${headerRow.join(' | ')}) — falling back to column ${FALLBACK_INDEX[field]}`);
+      colIndex[field] = FALLBACK_INDEX[field];
+    } else {
+      colIndex[field] = idx;
+    }
+  }
+
+  const range = `'${tabName}'!A4:Z2000`;
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
     range,
   });
   const rows = res.data.values || [];
   return rows
-    .filter((r) => r && r[0]) // skip fully blank rows
+    .filter((r) => r && r[colIndex.Case]) // skip fully blank rows
     .map((r) => ({
-      Case: r[0],
-      CustomerName: r[1],
-      CustomerComplaint: r[2],
-      DateInSent: r[3],
-      Amount: r[4],
-      Email: r[5],
-      Phone: r[6],
-      Comments: r[7],
+      Case: r[colIndex.Case],
+      CustomerName: r[colIndex.CustomerName],
+      CustomerComplaint: r[colIndex.CustomerComplaint],
+      DateInSent: r[colIndex.DateInSent],
+      Amount: r[colIndex.Amount],
+      Email: r[colIndex.Email],
+      Phone: r[colIndex.Phone],
+      Comments: r[colIndex.Comments],
     }));
 }

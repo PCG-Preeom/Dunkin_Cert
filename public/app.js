@@ -15,6 +15,13 @@ const TIER_LABELS = {
   unknown: 'Unknown',
 };
 
+const SEVERITY_LABELS = {
+  worst: 'Worst',
+  concerning: 'Concerning',
+  attention: 'Needs attention',
+  minor: 'Minor',
+};
+
 // First 3 letters of the month word are enough to recover the month even
 // from sheet-tab typos like "Nove 2025" or "Janury 2024".
 const MONTH_INDEX = {
@@ -140,14 +147,14 @@ function renderLeaderboard() {
   const byStore = new Map();
   for (const c of monthFiltered()) {
     const key = c.store_pc || 'Unknown';
-    if (!byStore.has(key)) byStore.set(key, { count: 0, high: 0, medium: 0, low: 0 });
+    if (!byStore.has(key)) byStore.set(key, { count: 0, worst: 0, concerning: 0, attention: 0, minor: 0 });
     const entry = byStore.get(key);
     entry.count += 1;
     entry[c.severity_label] += 1;
   }
 
   const ranked = [...byStore.entries()]
-    .map(([pc, v]) => ({ pc, ...v, weighted: v.high * 3 + v.medium }))
+    .map(([pc, v]) => ({ pc, ...v, weighted: v.worst * 4 + v.concerning * 2 + v.attention }))
     .sort((a, b) => b.weighted - a.weighted || b.count - a.count)
     .slice(0, 10);
 
@@ -158,10 +165,11 @@ function renderLeaderboard() {
       <div class="store-card">
         <div class="rank">#${i + 1}</div>
         <div class="pc">PC ${escapeHtml(s.pc)}</div>
-        <div class="store-bar" role="img" aria-label="${s.high} worst, ${s.medium} needs attention, ${s.low} good out of ${s.count} cases">
-          <span class="seg high" style="width:${pct(s.high)}%"></span>
-          <span class="seg medium" style="width:${pct(s.medium)}%"></span>
-          <span class="seg low" style="width:${pct(s.low)}%"></span>
+        <div class="store-bar" role="img" aria-label="${s.worst} worst, ${s.concerning} concerning, ${s.attention} needs attention, ${s.minor} minor out of ${s.count} cases">
+          <span class="seg worst" style="width:${pct(s.worst)}%"></span>
+          <span class="seg concerning" style="width:${pct(s.concerning)}%"></span>
+          <span class="seg attention" style="width:${pct(s.attention)}%"></span>
+          <span class="seg minor" style="width:${pct(s.minor)}%"></span>
         </div>
         <div class="count"><strong>${s.count}</strong> case${s.count === 1 ? '' : 's'}</div>
       </div>`;
@@ -171,7 +179,7 @@ function renderLeaderboard() {
 
 function renderFilterCounts() {
   const scoped = monthFiltered();
-  const counts = { all: scoped.length, high: 0, medium: 0, low: 0 };
+  const counts = { all: scoped.length, worst: 0, concerning: 0, attention: 0, minor: 0 };
   for (const c of scoped) counts[c.severity_label] = (counts[c.severity_label] || 0) + 1;
   document.querySelectorAll('.chip-count').forEach((el) => {
     const key = el.dataset.countFor;
@@ -264,7 +272,7 @@ function openModal(c) {
     </div>
     <h2 id="modalTitle" class="modal-title">${escapeHtml(c.customer_name || 'Unknown customer')}</h2>
     <div class="meter-wrap modal-meter" role="img" aria-label="Severity ${c.severity_score} of 100, ${c.severity_label}">
-      <span class="meter-label">${c.severity_score} / 100 — ${escapeHtml(c.severity_label)}</span>
+      <span class="meter-label">${c.severity_score} / 100 — ${escapeHtml(SEVERITY_LABELS[c.severity_label] || c.severity_label)}</span>
       <div class="meter-track">
         <div class="meter-fill ${c.severity_label}" style="width:${c.severity_score}%"></div>
       </div>

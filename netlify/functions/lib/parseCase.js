@@ -75,27 +75,82 @@ export function parseAmount(value) {
   return Number.isFinite(n) ? n : null;
 }
 
-// Escalation tier is the strongest signal, and it sets a hard ceiling on the
-// label: only an actual Second Escalation can ever be "high". A filled-in
-// Amount (reimbursement went out) or Comments (manual intervention) still
-// raise the score within that ceiling, but a paid/commented Guest Contact or
-// FYI case tops out at "medium" — it shouldn't outrank a real escalation just
-// because a small reimbursement happened.
-export function computeSeverity({ tier, amount, comments }) {
+// These push a case up regardless of its escalation tier — a "FYI" case that
+// mentions a lawyer or a hospital visit shouldn't stay buried just because
+// nobody re-categorized it in the sheet. Matched case-insensitively against
+// the actual complaint text (when there is any).
+const ESCALATION_KEYWORDS = [
+  'lawyer', 'attorney', 'legal action', 'lawsuit', 'sue', 'health department',
+  'corporate office', 'news station', 'social media', 'never coming back',
+  'boycott', 'better business bureau', 'bbb',
+];
+
+const HEALTH_SAFETY_KEYWORDS = [
+  'mold', 'sick', 'illness', 'allergic', 'allergy', 'hospital',
+  'injur', 'foreign object', 'hair in', 'bug in', 'insect', 'roach',
+  'cockroach', 'contamin', 'food poison', 'burned', 'scald', 'blood',
+  'glass in',
+];
+
+const CONDUCT_KEYWORDS = [
+  'rude', 'yelled', 'screamed', 'discriminat', 'racist', 'racial',
+  'unprofessional', 'curse', 'hung up on', 'disrespect',
+  'threatened', 'harass',
+];
+
+// Word-boundary match on the START of each keyword only (some, like "injur",
+// are deliberately partial so they also catch "injury"/"injured") — a plain
+// substring check would false-positive constantly, e.g. "sue" inside
+// "issue", which shows up in nearly every one of these complaint emails.
+function textHasAny(text, keywords) {
+  const lower = String(text || '').toLowerCase();
+  return keywords.some((k) => new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(lower));
+}
+
+// Escalation tier is the strongest tier-based signal, and (absent any
+// keyword override below) it caps how severe a case can be: only an actual
+// Second Escalation reaches "worst" on tier alone. A filled-in Amount
+// (reimbursement went out) or Comments (manual intervention) still raise the
+// score within that cap.
+//
+// But the complaint text itself can override that cap — legal/escalation
+// threats, health & safety issues, and serious conduct complaints all raise
+// a floor under the score, because a "FYI" case mentioning a lawyer is not
+// actually minor just because nobody re-tagged it.
+export function computeSeverity({ tier, amount, comments, complaintText }) {
   let score = 0;
-  if (tier === 'second_escalation') score += 50;
-  else if (tier === 'guest_contact') score += 20;
-  else if (tier === 'fyi') score += 5;
+  if (tier === 'second_escalation') score += 60;
+  else if (tier === 'guest_contact') score += 25;
+  else if (tier === 'fyi') score += 10;
 
-  if (amount && amount > 0) score += 30;
-  if (comments && String(comments).trim().length > 0) score += 20;
+  if (amount && amount > 0) score += 15;
+  if (comments && String(comments).trim().length > 0) score += 10;
 
+  if (tier !== 'second_escalation') score = Math.min(score, 74);
+
+  let floor = 0;
+  if (complaintText) {
+    if (textHasAny(complaintText, ESCALATION_KEYWORDS)) {
+      score += 35;
+      floor = Math.max(floor, 75);
+    }
+    if (textHasAny(complaintText, HEALTH_SAFETY_KEYWORDS)) {
+      score += 30;
+      floor = Math.max(floor, 50);
+    }
+    if (textHasAny(complaintText, CONDUCT_KEYWORDS)) {
+      score += 20;
+      floor = Math.max(floor, 25);
+    }
+  }
+
+  score = Math.max(score, floor);
   score = Math.min(score, 100);
-  if (tier !== 'second_escalation') score = Math.min(score, 49);
 
-  let label = 'low';
-  if (score >= 50) label = 'high';
-  else if (score >= 20) label = 'medium';
+  let label = 'minor';
+  if (score >= 75) label = 'worst';
+  else if (score >= 50) label = 'concerning';
+  else if (score >= 25) label = 'attention';
 
   return { score, label };
 }
@@ -118,7 +173,12 @@ export function parseCaseRow(row, sheetTab) {
 
   const tier = extractTier(raw);
   const amount = parseAmount(row.Amount);
-  const { score, label } = computeSeverity({ tier, amount, comments: row.Comments });
+  const { score, label } = computeSeverity({
+    tier,
+    amount,
+    comments: row.Comments,
+    complaintText: row.CustomerComplaint,
+  });
 
   return {
     case_id: caseId,

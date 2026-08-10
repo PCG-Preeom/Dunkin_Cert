@@ -15,8 +15,8 @@ create table if not exists public.cases (
   phone               text,
   comments            text,
   severity_score      int not null default 0,
-  severity_label      text not null default 'low'
-                       check (severity_label in ('low', 'medium', 'high')),
+  severity_label      text not null default 'minor'
+                       check (severity_label in ('worst', 'concerning', 'attention', 'minor')),
   sheet_tab           text not null,
   last_synced_at      timestamptz not null default now()
 );

@@ -72,12 +72,13 @@ export function normalizeDate(value) {
 
 // Fallback for rows where DateInSent is blank because the whole raw Guest
 // Support email got pasted into Customer Complaint instead — those emails
-// always carry a date themselves ("Incident Date: 08-08-2026" or "Contact
-// Received: 08-08-2026 07:47:54 PM EDT"). Tries Incident Date first since
-// that's the actual event date; Contact Received is only when there's no
-// pasted email that we're missing.
+// carry a date themselves under one of a few different labels depending on
+// how the email was generated. Tried in priority order: the actual
+// event/visit date first, "Contact Received" (when the email arrived) last
+// since that's the least representative of when the incident happened.
 const DATE_IN_TEXT_PATTERNS = [
   /Incident Date:\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
+  /Date Of Visit:\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
   /Contact Received:\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
 ];
 export function extractDateFromText(text) {

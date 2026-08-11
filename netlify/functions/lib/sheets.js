@@ -42,7 +42,9 @@ const HEADER_ALIASES = {
   Phone: ['phone'],
   Comments: ['comments', 'comment'],
 };
-const normalizeHeader = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+// Strip punctuation like "/" and "#" too — real headers include "Date in/
+// Sent" and "Phone#", which otherwise never match a plain-word alias.
+const normalizeHeader = (s) => String(s || '').trim().toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
 
 // Row 3 in the sheet is the header (Case, Customer Name, ...), data starts row 4.
 // Column order isn't assumed to be fixed A-H — some month tabs have an extra or
@@ -53,11 +55,17 @@ const normalizeHeader = (s) => String(s || '').trim().toLowerCase().replace(/\s+
 export async function fetchTabRows(tabName) {
   const sheets = google.sheets({ version: 'v4', auth: getAuth() });
 
-  const headerRes = await sheets.spreadsheets.values.get({
+  // One batchGet instead of two separate .get() calls — fetching the header
+  // and data ranges separately doubled our Sheets API request count and
+  // tripped the per-minute read quota when resyncing all ~40 tabs back to
+  // back.
+  const batchRes = await sheets.spreadsheets.values.batchGet({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: `'${tabName}'!A3:Z3`,
+    ranges: [`'${tabName}'!A3:Z3`, `'${tabName}'!A4:Z2000`],
   });
-  const headerRow = (headerRes.data.values || [[]])[0] || [];
+  const [headerRange, dataRange] = batchRes.data.valueRanges;
+
+  const headerRow = (headerRange.values || [[]])[0] || [];
   const normalizedHeaders = headerRow.map(normalizeHeader);
 
   // Build field -> column index by matching against HEADER_ALIASES. Falls back
@@ -77,12 +85,7 @@ export async function fetchTabRows(tabName) {
     }
   }
 
-  const range = `'${tabName}'!A4:Z2000`;
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range,
-  });
-  const rows = res.data.values || [];
+  const rows = dataRange.values || [];
   return rows
     .filter((r) => r && r[colIndex.Case]) // skip fully blank rows
     .map((r) => ({

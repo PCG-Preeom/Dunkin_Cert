@@ -93,6 +93,22 @@ export function extractDateFromText(text) {
   return null;
 }
 
+// Almost every one of these pasted emails carries an "Incident Hour:" (or
+// occasionally "Time Of Visit:") alongside the date — captured separately
+// since the sheet/DB only ever had a date column, not a combined timestamp.
+const TIME_IN_TEXT_PATTERNS = [
+  /Incident Hour:\s*([\d:]{3,8}\s*(?:AM|PM)?\s*[A-Z]{0,4})/i,
+  /Time Of Visit:\s*([\d:]{3,8}\s*(?:AM|PM)?\s*[A-Z]{0,4})/i,
+];
+export function extractTimeFromText(text) {
+  if (!text) return null;
+  for (const regex of TIME_IN_TEXT_PATTERNS) {
+    const match = String(text).match(regex);
+    if (match) return match[1].trim();
+  }
+  return null;
+}
+
 export function parseAmount(value) {
   if (!value) return null;
   const cleaned = String(value).replace(/[^0-9.]/g, '');
@@ -215,6 +231,7 @@ export function parseCaseRow(row, sheetTab) {
     customer_name: row.CustomerName || null,
     customer_complaint: row.CustomerComplaint || null,
     date_in_sent: normalizeDate(row.DateInSent) || extractDateFromText(row.CustomerComplaint),
+    incident_time: extractTimeFromText(row.CustomerComplaint),
     amount,
     email: row.Email || null,
     phone: row.Phone || null,

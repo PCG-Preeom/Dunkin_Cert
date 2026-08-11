@@ -280,6 +280,7 @@ function openModal(c) {
 
     ${detailRow('Store', c.store_pc ? `PC ${c.store_pc}` : null)}
     ${detailRow('Date', c.date_in_sent)}
+    ${detailRow('Time', c.incident_time)}
     ${detailRow('Amount', amount)}
     ${detailRow('Email', c.email)}
     ${detailRow('Phone', c.phone)}

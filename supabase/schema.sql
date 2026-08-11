@@ -10,6 +10,7 @@ create table if not exists public.cases (
   customer_name       text,
   customer_complaint  text,
   date_in_sent        date,
+  incident_time       text,
   amount              numeric(10, 2),
   email               text,
   phone               text,

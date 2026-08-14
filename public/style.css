@@ -603,6 +603,46 @@ body {
 .comment-status.warn { color: var(--sev-attention); }
 .comment-status.error { color: var(--sev-worst); }
 
+.comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.comment-item {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.comment-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.comment-author {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.comment-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.comment-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
 @media (max-width: 480px) {
   .modal { padding: 20px; max-height: 90vh; }
 }

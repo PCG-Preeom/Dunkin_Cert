@@ -261,6 +261,45 @@ function formatLongText(text) {
   return escapeHtml(collapsed).replace(/\n/g, '<br>');
 }
 
+function renderCommentItem(comment) {
+  const when = new Date(comment.created_at);
+  const stamp = Number.isNaN(when.getTime())
+    ? ''
+    : when.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  return `
+    <div class="comment-item">
+      <div class="comment-meta">
+        <span class="comment-author">${escapeHtml(comment.author_name)}</span>
+        <span class="comment-time">${escapeHtml(stamp)}</span>
+      </div>
+      <div class="comment-text">${escapeHtml(comment.comment_text)}</div>
+    </div>`;
+}
+
+// Comments live in their own table (case_id, author_name, comment_text,
+// created_at) shared with the other app that also captures these
+// complaints — fetched separately from the case list since it's per-case
+// detail, not something worth loading for every row up front.
+async function loadAndRenderComments(caseId) {
+  const { data, error } = await supabase
+    .from('case_comments')
+    .select('*')
+    .eq('case_id', caseId)
+    .order('created_at', { ascending: true });
+
+  // The modal may have closed, or moved on to a different case, while this
+  // fetch was in flight — don't clobber whatever's showing now.
+  if (currentCaseId !== caseId) return;
+  const listEl = document.getElementById('commentsList');
+  if (!listEl) return;
+
+  if (error) {
+    listEl.innerHTML = `<p class="modal-text">Couldn't load comments: ${escapeHtml(error.message)}</p>`;
+    return;
+  }
+  listEl.innerHTML = data.length ? data.map(renderCommentItem).join('') : '<p class="modal-text">No comments yet.</p>';
+}
+
 function openModal(c) {
   const amount = c.amount ? `$${Number(c.amount).toFixed(2)}` : null;
   const tierLabel = TIER_LABELS[c.case_tier] || c.case_tier;
@@ -294,7 +333,7 @@ function openModal(c) {
 
     <div class="modal-section">
       <h3>Comments</h3>
-      <p class="modal-text" id="commentsText">${c.comments ? formatLongText(c.comments) : 'No comments yet.'}</p>
+      <div class="comments-list" id="commentsList"><p class="modal-text">Loading comments…</p></div>
       <form class="comment-form" id="commentForm">
         <input type="text" id="commentAuthor" placeholder="Your name" value="${escapeHtml(localStorage.getItem('caseWatchCommenterName') || '')}" required />
         <textarea id="commentText" placeholder="Add a comment…" required></textarea>
@@ -304,6 +343,8 @@ function openModal(c) {
         </div>
       </form>
     </div>
+
+    ${c.comments ? `<div class="modal-section"><h3>Notes from sheet</h3><p class="modal-text">${formatLongText(c.comments)}</p></div>` : ''}
 
     <div class="modal-section">
       <h3>Raw case label</h3>
@@ -315,6 +356,8 @@ function openModal(c) {
   lastFocusedEl = document.activeElement;
   modalBackdropEl.hidden = false;
   modalCloseEl.focus();
+
+  loadAndRenderComments(c.case_id);
 }
 
 function closeModal() {
@@ -334,6 +377,7 @@ modalBodyEl.addEventListener('submit', async (e) => {
   const textEl = document.getElementById('commentText');
   const submitEl = document.getElementById('commentSubmit');
   const statusEl = document.getElementById('commentStatus');
+  const listEl = document.getElementById('commentsList');
 
   const author = authorEl.value.trim();
   const text = textEl.value.trim();
@@ -354,10 +398,10 @@ modalBodyEl.addEventListener('submit', async (e) => {
 
     localStorage.setItem('caseWatchCommenterName', author);
 
-    const c = state.cases.find((x) => x.case_id === currentCaseId);
-    if (c) c.comments = result.comments;
-
-    document.getElementById('commentsText').innerHTML = formatLongText(result.comments);
+    if (listEl) {
+      if (!listEl.querySelector('.comment-item')) listEl.innerHTML = '';
+      listEl.insertAdjacentHTML('beforeend', renderCommentItem(result.comment));
+    }
     textEl.value = '';
     statusEl.textContent = result.sheetError ? 'Saved (sheet update failed — check logs)' : 'Posted';
     statusEl.className = result.sheetError ? 'comment-status warn' : 'comment-status ok';

@@ -544,6 +544,65 @@ body {
   color: var(--text-muted);
 }
 
+.comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.comment-form input,
+.comment-form textarea {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  padding: 9px 10px;
+  resize: vertical;
+}
+
+.comment-form textarea { min-height: 64px; }
+
+.comment-form input:focus,
+.comment-form textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.comment-form-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.comment-form button {
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 13px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.comment-form button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.comment-status {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.comment-status.ok { color: var(--sev-minor); }
+.comment-status.warn { color: var(--sev-attention); }
+.comment-status.error { color: var(--sev-worst); }
+
 @media (max-width: 480px) {
   .modal { padding: 20px; max-height: 90vh; }
 }

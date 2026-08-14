@@ -62,6 +62,7 @@ const modalBodyEl = document.getElementById('modalBody');
 const modalCloseEl = document.getElementById('modalClose');
 
 let lastFocusedEl = null;
+let currentCaseId = null;
 
 function timeAgo(iso) {
   if (!iso) return null;
@@ -291,7 +292,18 @@ function openModal(c) {
       <p class="modal-text">${c.customer_complaint ? formatLongText(c.customer_complaint) : 'No complaint text recorded yet.'}</p>
     </div>
 
-    ${c.comments ? `<div class="modal-section"><h3>Comments</h3><p class="modal-text">${formatLongText(c.comments)}</p></div>` : ''}
+    <div class="modal-section">
+      <h3>Comments</h3>
+      <p class="modal-text" id="commentsText">${c.comments ? formatLongText(c.comments) : 'No comments yet.'}</p>
+      <form class="comment-form" id="commentForm">
+        <input type="text" id="commentAuthor" placeholder="Your name" value="${escapeHtml(localStorage.getItem('caseWatchCommenterName') || '')}" required />
+        <textarea id="commentText" placeholder="Add a comment…" required></textarea>
+        <div class="comment-form-footer">
+          <button type="submit" id="commentSubmit">Post comment</button>
+          <span class="comment-status" id="commentStatus"></span>
+        </div>
+      </form>
+    </div>
 
     <div class="modal-section">
       <h3>Raw case label</h3>
@@ -299,6 +311,7 @@ function openModal(c) {
     </div>
   `;
 
+  currentCaseId = c.case_id;
   lastFocusedEl = document.activeElement;
   modalBackdropEl.hidden = false;
   modalCloseEl.focus();
@@ -307,8 +320,54 @@ function openModal(c) {
 function closeModal() {
   modalBackdropEl.hidden = true;
   modalBodyEl.innerHTML = '';
+  currentCaseId = null;
   if (lastFocusedEl) lastFocusedEl.focus();
 }
+
+modalBodyEl.addEventListener('submit', async (e) => {
+  const form = e.target.closest('#commentForm');
+  if (!form) return;
+  e.preventDefault();
+  if (!currentCaseId) return;
+
+  const authorEl = document.getElementById('commentAuthor');
+  const textEl = document.getElementById('commentText');
+  const submitEl = document.getElementById('commentSubmit');
+  const statusEl = document.getElementById('commentStatus');
+
+  const author = authorEl.value.trim();
+  const text = textEl.value.trim();
+  if (!author || !text) return;
+
+  submitEl.disabled = true;
+  statusEl.textContent = 'Posting…';
+  statusEl.className = 'comment-status';
+
+  try {
+    const res = await fetch('/.netlify/functions/add-comment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ caseId: currentCaseId, author, text }),
+    });
+    const result = await res.json();
+    if (!res.ok || !result.ok) throw new Error(result.error || 'Failed to post comment');
+
+    localStorage.setItem('caseWatchCommenterName', author);
+
+    const c = state.cases.find((x) => x.case_id === currentCaseId);
+    if (c) c.comments = result.comments;
+
+    document.getElementById('commentsText').innerHTML = formatLongText(result.comments);
+    textEl.value = '';
+    statusEl.textContent = result.sheetError ? 'Saved (sheet update failed — check logs)' : 'Posted';
+    statusEl.className = result.sheetError ? 'comment-status warn' : 'comment-status ok';
+  } catch (err) {
+    statusEl.textContent = err.message || 'Failed to post comment';
+    statusEl.className = 'comment-status error';
+  } finally {
+    submitEl.disabled = false;
+  }
+});
 
 caseListEl.addEventListener('click', (e) => {
   const row = e.target.closest('.case-row');

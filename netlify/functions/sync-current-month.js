@@ -36,4 +36,4 @@ export default async () => {
   }
 };
 
-export const config = { schedule: '@hourly' };
+export const config = { schedule: '*/15 * * * *' };

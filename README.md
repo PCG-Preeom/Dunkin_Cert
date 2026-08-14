@@ -1,11 +1,11 @@
 # Case Watch
 
-Hourly/weekly sync of the "CC Gift card Reinbursment" Google Sheet into a
-Supabase database, with a dashboard that ranks stores and cases by severity.
+Sync of the "CC Gift card Reinbursment" Google Sheet into a Supabase
+database, with a dashboard that ranks stores and cases by severity.
 
 **How it works:**
-- `sync-current-month` — a Netlify Scheduled Function that runs every hour
-  and re-reads just this month's tab (e.g. "August 2026").
+- `sync-current-month` — a Netlify Scheduled Function that runs every 15
+  minutes and re-reads just this month's tab (e.g. "August 2026").
 - `sync-historical` — a Netlify Scheduled Function that runs once a week and
   sweeps every other month tab, in case something old gets edited.
 - Both write into a `cases` table in Supabase. The dashboard (`public/`) is
@@ -84,13 +84,13 @@ cp public/config.js.example public/config.js   # fill in SUPABASE_URL + anon key
   message (usually a missing env var or the sheet not being shared with the
   service account).
 
-### If hourly runs ever feel unreliable
+### If the 15-minute runs ever feel unreliable
 
 Netlify's Scheduled Functions are enabled by default and don't need a paid
-plan for an hourly cadence — this should just work. If you ever want a
-backup trigger, you can add a free GitHub Actions workflow that calls
+plan for this cadence — this should just work. If you ever want a backup
+trigger, you can add a free GitHub Actions workflow that calls
 `https://your-site.netlify.app/.netlify/functions/sync-current-month` on a
-`cron: '0 * * * *'` schedule — no code changes needed, it just hits the
+`cron: '*/15 * * * *'` schedule — no code changes needed, it just hits the
 same URL from outside Netlify.
 
 ---
@@ -99,7 +99,7 @@ same URL from outside Netlify.
 
 ```
 netlify/functions/
-  sync-current-month.js   hourly — current month tab only
+  sync-current-month.js   every 15 minutes — current month tab only
   sync-historical.js      weekly — every other month tab
   lib/
     sheets.js             Google Sheets read access

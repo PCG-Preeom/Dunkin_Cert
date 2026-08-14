@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Hourly/weekly sync of the CC Gift Card Reimbursement sheet into Supabase, with a severity dashboard.",
+  "description": "15-minute/weekly sync of the CC Gift Card Reimbursement sheet into Supabase, with a severity dashboard.",
   "scripts": {
     "dev": "netlify dev"
   },

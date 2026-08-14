@@ -261,15 +261,23 @@ function formatLongText(text) {
   return escapeHtml(collapsed).replace(/\n/g, '<br>');
 }
 
+const SOURCE_LABELS = {
+  case_watch: 'Case Watch',
+  portal: 'Portal',
+};
+
 function renderCommentItem(comment) {
   const when = new Date(comment.created_at);
   const stamp = Number.isNaN(when.getTime())
     ? ''
     : when.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const source = comment.source || 'portal';
+  const sourceLabel = SOURCE_LABELS[source] || source;
   return `
-    <div class="comment-item">
+    <div class="comment-item source-${escapeHtml(source)}">
       <div class="comment-meta">
         <span class="comment-author">${escapeHtml(comment.author_name)}</span>
+        <span class="comment-source-badge">${escapeHtml(sourceLabel)}</span>
         <span class="comment-time">${escapeHtml(stamp)}</span>
       </div>
       <div class="comment-text">${escapeHtml(comment.comment_text)}</div>

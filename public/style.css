@@ -613,13 +613,20 @@ body {
 .comment-item {
   background: var(--surface-raised);
   border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
   border-radius: 8px;
   padding: 10px 12px;
 }
 
+/* Case Watch comments in accent orange, Portal comments in blue — lets you
+   tell at a glance whether a note was typed here or came from the other
+   platform, without having to read the badge text. */
+.comment-item.source-case_watch { border-left-color: var(--accent); }
+.comment-item.source-portal { border-left-color: #3b82f6; }
+
 .comment-meta {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
   gap: 8px;
   margin-bottom: 4px;
 }
@@ -630,10 +637,26 @@ body {
   color: var(--text);
 }
 
+.comment-source-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+}
+
+.source-case_watch .comment-source-badge { color: var(--accent); border-color: var(--accent); }
+.source-portal .comment-source-badge { color: #3b82f6; border-color: #3b82f6; }
+
 .comment-time {
   font-size: 11px;
   color: var(--text-muted);
   font-family: var(--font-mono);
+  margin-left: auto;
 }
 
 .comment-text {

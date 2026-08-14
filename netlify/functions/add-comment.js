@@ -43,7 +43,7 @@ export default async (req) => {
 
   const { data: inserted, error: insertError } = await supabase
     .from('case_comments')
-    .insert({ case_id: caseId, author_name: author, comment_text: text })
+    .insert({ case_id: caseId, author_name: author, comment_text: text, source: 'case_watch' })
     .select()
     .single();
 
